@@ -2,99 +2,47 @@
 
 set -euo pipefail
 
-# CENTINELA - DEPLOY SCRIPT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
 
 CONFIG_FILE="$PROJECT_ROOT/config/dev.env"
+BICEP_FILE="$PROJECT_ROOT/infra/main.bicep"
 
-# Validate configuration
+echo "=================================="
+echo "CENTINELA INFRASTRUCTURE DEPLOY"
+echo "=================================="
 
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "ERROR: Configuration file not found."
-    echo ""
-    echo "Create it using:"
-    echo "cp config/dev.env.example config/dev.env"
-    exit 1
-fi
+require_command az
 
-# Load configuration
-source "$CONFIG_FILE"
+load_config "$CONFIG_FILE"
 
-# Validate required variables
+require_azure_login
 
-required_variables=(
-    "SUBSCRIPTION_ID"
-    "PROJECT_NAME"
-    "ENVIRONMENT"
-    "LOCATION"
-    "RESOURCE_GROUP_NAME"
-)
-
-for variable in "${required_variables[@]}"; do
-
-    if [[ -z "${!variable:-}" ]]; then
-        echo "ERROR: Required variable '$variable' is empty."
-        exit 1
-    fi
-
-done
-
-# Validate Azure CLI
-
-if ! command -v az &> /dev/null; then
-
-    echo "ERROR: Azure CLI is not installed."
-
-    exit 1
-
-fi
-
-# Validate Azure login
-
-if ! az account show &> /dev/null; then
-
-    echo "ERROR: You are not logged into Azure."
-
-    echo ""
-    echo "Run:"
-    echo "az login"
-
-    exit 1
-
-fi
-
-# Select subscription
-
-echo ""
-echo "Selecting Azure subscription..."
+log_info "Selecting Azure subscription..."
 
 az account set \
     --subscription "$SUBSCRIPTION_ID"
 
-# Deployment information
+log_success "Subscription selected."
 
-echo ""
-echo "=========================================="
-echo "CENTINELA INFRASTRUCTURE DEPLOYMENT"
-echo "=========================================="
+log_info "Creating Resource Group..."
 
-echo "Project:       $PROJECT_NAME"
-echo "Environment:   $ENVIRONMENT"
-echo "Location:      $LOCATION"
-echo "Resource Group: $RESOURCE_GROUP_NAME"
+az group create \
+    --name "$RESOURCE_GROUP_NAME" \
+    --location "$LOCATION" \
+    --output none
 
-echo ""
-echo "=========================================="
-echo "DEPLOYMENT STARTED"
-echo "=========================================="
+log_success "Resource Group ready."
 
-# TODO:
+log_info "Deploying infrastructure..."
 
-echo ""
-echo "Infrastructure deployment will be executed here."
+az deployment group create \
+    --resource-group "$RESOURCE_GROUP_NAME" \
+    --template-file "$BICEP_FILE" \
+    --parameters \
+        projectName="$PROJECT_NAME" \
+        environment="$ENVIRONMENT"
 
-echo ""
-echo "=========================================="
-echo "DEPLOYMENT FINISHED"
-echo "=========================================="
+log_success "Infrastructure deployed successfully."

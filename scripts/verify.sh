@@ -2,79 +2,92 @@
 
 set -euo pipefail
 
-# CENTINELA - VERIFY SCRIPT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
 
 CONFIG_FILE="$PROJECT_ROOT/config/dev.env"
 
-# Validate configuration
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-
-    echo "ERROR: Configuration file not found."
-
-    echo ""
-    echo "Create it using:"
-    echo "cp config/dev.env.example config/dev.env"
-
-    exit 1
-
-fi
-
-source "$CONFIG_FILE"
-
-# Validate Azure CLI
-
-if ! command -v az &> /dev/null; then
-
-    echo "ERROR: Azure CLI is not installed."
-
-    exit 1
-
-fi
-
-# Validate Azure login
-
-if ! az account show &> /dev/null; then
-
-    echo "ERROR: You are not logged into Azure."
-
-    echo ""
-    echo "Run:"
-    echo "az login"
-
-    exit 1
-
-fi
-
-# Select subscription
-
-az account set \
-    --subscription "$SUBSCRIPTION_ID"
-
-# Verification
-
-echo ""
 echo "=========================================="
-echo "CENTINELA INFRASTRUCTURE VERIFICATION"
+echo "    CENTINELA INFRASTRUCTURE VERIFY"
 echo "=========================================="
-
 echo ""
-echo "Checking Resource Group..."
+
+# ------------------------------------------
+# Requirements
+# ------------------------------------------
+
+log_info "Checking required commands..."
+
+require_command az
+
+# ------------------------------------------
+# Configuration
+# ------------------------------------------
+
+log_info "Loading environment configuration..."
+
+load_config "$CONFIG_FILE"
+
+# ------------------------------------------
+# Azure Authentication
+# ------------------------------------------
+
+log_info "Checking Azure authentication..."
+
+require_azure_login
+
+# ------------------------------------------
+# Azure Subscription
+# ------------------------------------------
+
+select_subscription
+
+# ------------------------------------------
+# Resource Group
+# ------------------------------------------
+
+log_info "Checking Resource Group..."
 
 if az group show \
     --name "$RESOURCE_GROUP_NAME" \
     &> /dev/null; then
 
-    echo "[OK] Resource Group exists."
+    log_success "Resource Group exists."
 
 else
 
-    echo "[FAIL] Resource Group does not exist."
+    log_error "Resource Group does not exist:"
+    echo "$RESOURCE_GROUP_NAME"
 
+    exit 1
 fi
 
+# ------------------------------------------
+# Storage Account
+# ------------------------------------------
+
+STORAGE_ACCOUNT_NAME="${PROJECT_NAME}${ENVIRONMENT}storage"
+
+log_info "Checking Storage Account..."
+
+if az storage account show \
+    --name "$STORAGE_ACCOUNT_NAME" \
+    --resource-group "$RESOURCE_GROUP_NAME" \
+    &> /dev/null; then
+
+    log_success "Storage Account exists."
+
+else
+
+    log_error "Storage Account does not exist:"
+    echo "$STORAGE_ACCOUNT_NAME"
+
+    exit 1
+fi
+
+echo ""
 echo "=========================================="
-echo "VERIFICATION FINISHED"
+echo "Infrastructure verification successful."
 echo "=========================================="

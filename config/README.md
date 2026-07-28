@@ -1,10 +1,10 @@
-# Configuración del entorno
+# Configuration
 
-Este directorio contiene los archivos de configuración utilizados por los scripts de infraestructura de Centinela.
+This directory contains environment-specific configuration files.
 
-## Configuración inicial
+## Development Environment
 
-Copiar el archivo de ejemplo:
+Create your local environment configuration:
 
 ```bash
 cp config/dev.env.example config/dev.env

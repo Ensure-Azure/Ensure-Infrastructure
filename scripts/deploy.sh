@@ -1,100 +1,59 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+# Stop execution if an error occurs
+set -e
 
-# CENTINELA - DEPLOY SCRIPT
+# Import utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/lib/utils.sh"
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+log_info "Starting infrastructure deployment process..."
 
-CONFIG_FILE="$PROJECT_ROOT/config/dev.env"
-
-# Validate configuration
-
-if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "ERROR: Configuration file not found."
-    echo ""
-    echo "Create it using:"
-    echo "cp config/dev.env.example config/dev.env"
+# 1. Load environment variables securely
+ENV_FILE="${PROJECT_ROOT}/.env"
+if [ -f "$ENV_FILE" ]; then
+    log_info "Loading .env configuration file..."
+    set -a
+    source "$ENV_FILE"
+    set +a
+else
+    log_error "The .env file was not found in the project root."
+    log_warn "Copy 'config/dev.env.example' to '.env' in the project root and configure your variables."
     exit 1
 fi
 
-# Load configuration
-source "$CONFIG_FILE"
+# 2. Azure CLI checks
+check_az_cli
+check_az_login
 
-# Validate required variables
+# 3. Select subscription
+log_info "Setting the target subscription: ${AZURE_SUBSCRIPTION_ID}..."
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 
-required_variables=(
-    "SUBSCRIPTION_ID"
-    "PROJECT_NAME"
-    "ENVIRONMENT"
-    "LOCATION"
-    "RESOURCE_GROUP_NAME"
-)
+# 4. Create the Resource Group if it does not exist
+log_info "Verifying/Creating Resource Group '${RESOURCE_GROUP_NAME}' in '${LOCATION}'..."
+az group create \
+    --name "$RESOURCE_GROUP_NAME" \
+    --location "$LOCATION" \
+    --output table
 
-for variable in "${required_variables[@]}"; do
+# 5. Run Bicep deployment
+BICEP_FILE="${PROJECT_ROOT}/infra/main.bicep"
 
-    if [[ -z "${!variable:-}" ]]; then
-        echo "ERROR: Required variable '$variable' is empty."
-        exit 1
-    fi
-
-done
-
-# Validate Azure CLI
-
-if ! command -v az &> /dev/null; then
-
-    echo "ERROR: Azure CLI is not installed."
-
+if [ ! -f "$BICEP_FILE" ]; then
+    log_error "The main Bicep file was not found at '${BICEP_FILE}'."
     exit 1
-
 fi
 
-# Validate Azure login
+log_info "Running the Bicep deployment in Azure..."
+az deployment group create \
+    --resource-group "$RESOURCE_GROUP_NAME" \
+    --template-file "$BICEP_FILE" \
+    --parameters \
+        projectName="$PROJECT_NAME" \
+        environment="$ENVIRONMENT" \
+        location="$LOCATION" \
+    --output table
 
-if ! az account show &> /dev/null; then
-
-    echo "ERROR: You are not logged into Azure."
-
-    echo ""
-    echo "Run:"
-    echo "az login"
-
-    exit 1
-
-fi
-
-# Select subscription
-
-echo ""
-echo "Selecting Azure subscription..."
-
-az account set \
-    --subscription "$SUBSCRIPTION_ID"
-
-# Deployment information
-
-echo ""
-echo "=========================================="
-echo "CENTINELA INFRASTRUCTURE DEPLOYMENT"
-echo "=========================================="
-
-echo "Project:       $PROJECT_NAME"
-echo "Environment:   $ENVIRONMENT"
-echo "Location:      $LOCATION"
-echo "Resource Group: $RESOURCE_GROUP_NAME"
-
-echo ""
-echo "=========================================="
-echo "DEPLOYMENT STARTED"
-echo "=========================================="
-
-# TODO:
-
-echo ""
-echo "Infrastructure deployment will be executed here."
-
-echo ""
-echo "=========================================="
-echo "DEPLOYMENT FINISHED"
-echo "=========================================="
+log_success "Deployment completed successfully!"

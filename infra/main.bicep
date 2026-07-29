@@ -1,27 +1,50 @@
-targetScope = 'resourceGroup'
-
 @description('Project name')
 param projectName string = 'centinela'
 
-@description('Environment name')
+@description('Deployment environment (dev, staging, prod)')
 param environment string = 'dev'
 
-var storageAccountName = '${projectName}${environment}storage'
+@description('Azure region')
+param location string = 'westus2'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: storageAccountName
-  location: resourceGroup().location
+var vnetName = 'vr-${projectName}-${environment}'
+var keyVaultName = 'kv-${projectName}-${environment}'
+var storageName = 'st${projectName}${environment}1'
+var cosmosName = 'cosmos-${projectName}-${environment}'
 
-  sku: {
-    name: 'Standard_LRS'
-  }
-
-  kind: 'StorageV2'
-
-  properties: {
-    accessTier: 'Hot'
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
-    supportsHttpsTrafficOnly: true
+module vnetModule './modules/virtualnetwork.bicep' = {
+  name: 'vnetDeployment'
+  params: {
+    vnetName: vnetName
+    location: location
   }
 }
+
+module keyVaultModule './modules/keyvault.bicep' = {
+  name: 'keyVaultDeployment'
+  params: {
+    keyVaultName: keyVaultName
+    location: location
+  }
+}
+
+module storageModule './modules/storage.bicep' = {
+  name: 'storageDeployment'
+  params: {
+    storageName: storageName
+    location: location
+  }
+}
+
+module cosmosModule './modules/cosmos.bicep' = {
+  name: 'cosmosDeployment'
+  params: {
+    cosmosName: cosmosName
+    location: location
+  }
+}
+
+output vnetId string = vnetModule.outputs.vnetId
+output keyVaultUri string = keyVaultModule.outputs.keyVaultUri
+output storageBlobEndpoint string = storageModule.outputs.primaryBlobEndpoint
+output cosmosEndpoint string = cosmosModule.outputs.cosmosEndpoint

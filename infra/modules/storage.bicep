@@ -1,25 +1,22 @@
-@description('Name of the Storage Account')
-param storageAccountName string
+@description('Storage Account name (must be globally unique and only lowercase letters/numbers)')
+param storageName string
 
-@description('Azure region where the Storage Account will be deployed')
+@description('Resource location')
 param location string
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: storageAccountName
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: storageName
   location: location
-
   sku: {
     name: 'Standard_LRS'
   }
-
   kind: 'StorageV2'
-
   properties: {
     accessTier: 'Hot'
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
     supportsHttpsTrafficOnly: true
+    minimumTlsVersion: 'TLS1_2'
   }
 }
 
-output storageAccountName string = storageAccount.name
+output storageAccountId string = storageAccount.id
+output primaryBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob

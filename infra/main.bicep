@@ -19,6 +19,15 @@ param location string = 'westus2'
 // Network
 var vnetName = 'vr-${projectName}-${environment}'
 
+// App Service Plan
+var appServicePlanName = 'asp-${projectName}-${environment}'
+
+// Identity
+var managedIdentityName = 'mi-${projectName}-${environment}'
+
+// App Service
+var appServiceName = 'app-${projectName}-${environment}'
+
 // Storage
 var storageName = 'st${projectName}${environment}01'
 
@@ -27,6 +36,7 @@ var keyVaultName = 'kv-${projectName}-${environment}'
 
 // Database
 var cosmosName = 'cosmos-${projectName}-${environment}'
+
 
 
 //==================================================
@@ -47,9 +57,86 @@ module network './modules/virtualnetwork.bicep' = {
 }
 
 //----------------------------
-// Key Vault
+// App Service Plan
 //----------------------------
 
+module appServicePlan './modules/appserviceplan.bicep' = {
+  name: '${projectName}-appserviceplan'
+
+  params: {
+    appServicePlanName: appServicePlanName
+
+    location: location
+
+    tags: {
+      Project: projectName
+      Environment: environment
+      ManagedBy: 'Bicep'
+    }
+  }
+}
+
+//----------------------------
+// Managed Identity
+//----------------------------
+
+module managedIdentity './modules/managedidentity.bicep' = {
+
+  name: '${projectName}-managedidentity'
+
+  params: {
+
+    identityName: managedIdentityName
+
+    location: location
+
+    tags: {
+
+      Project: projectName
+
+      Environment: environment
+
+      ManagedBy: 'Bicep'
+
+    }
+
+  }
+
+}
+
+//----------------------------
+// App Service
+//----------------------------
+
+module appService './modules/appservice.bicep' = {
+
+  name: '${projectName}-appservice'
+
+  params: {
+
+    appServiceName: appServiceName
+
+    location: location
+
+    appServicePlanId: appServicePlan.outputs.appServicePlanId
+
+    managedIdentityId: managedIdentity.outputs.identityId
+
+    tags: {
+
+      Project: projectName
+
+      Environment: environment
+
+      ManagedBy: 'Bicep'
+
+    }
+
+  }
+
+}
+
+// Key Vault
 module keyVault './modules/keyvault.bicep' = {
   name: '${projectName}-keyvault'
 
@@ -91,6 +178,16 @@ module cosmos './modules/cosmos.bicep' = {
 //==================================================
 
 output vnetId string = network.outputs.vnetId
+
+output appServicePlanId string = appServicePlan.outputs.appServicePlanId
+
+output managedIdentityId string = managedIdentity.outputs.identityId
+
+output managedIdentityPrincipalId string = managedIdentity.outputs.principalId
+
+output appServiceName string = appService.outputs.appServiceName
+
+output appServiceUrl string = appService.outputs.defaultHostName
 
 output keyVaultUri string = keyVault.outputs.keyVaultUri
 

@@ -37,7 +37,13 @@ var keyVaultName = 'kv-${projectName}-${environment}'
 // Database
 var cosmosName = 'cosmos-${projectName}-${environment}'
 
+// Service Bus
+var serviceBusName = 'sb-${projectName}-${environment}'
+// Monitoring
 
+var appInsightsName = 'appi-${projectName}-${environment}'
+
+var logAnalyticsName = 'log-${projectName}-${environment}'
 
 //==================================================
 // MODULES
@@ -104,6 +110,32 @@ module managedIdentity './modules/managedidentity.bicep' = {
 
 }
 
+//  monitoring 
+module monitoring './modules/monitoring.bicep' = {
+
+  name: '${projectName}-monitoring'
+
+  params: {
+
+    appInsightsName: appInsightsName
+
+    workspaceName: logAnalyticsName
+
+    location: location
+
+    tags: {
+
+      Project: projectName
+
+      Environment: environment
+
+      ManagedBy: 'Bicep'
+
+    }
+
+  }
+
+}
 //----------------------------
 // App Service
 //----------------------------
@@ -122,6 +154,10 @@ module appService './modules/appservice.bicep' = {
 
     managedIdentityId: managedIdentity.outputs.identityId
 
+    subnetId: network.outputs.appServiceSubnetId
+    
+    applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
+
     tags: {
 
       Project: projectName
@@ -132,7 +168,7 @@ module appService './modules/appservice.bicep' = {
 
     }
 
-  }
+}
 
 }
 
@@ -145,18 +181,65 @@ module keyVault './modules/keyvault.bicep' = {
     location: location
   }
 }
+// Key Vault Access (permisions)
+module keyVaultAccess './modules/roleassignments.bicep' = {
 
+  name: '${projectName}-keyvault-access'
+
+  params: {
+
+    keyVaultName: keyVaultName
+
+    principalId: managedIdentity.outputs.principalId
+
+  }
+
+}
+module keyVaultPrivateEndpoint './modules/privateendpoint.bicep' = {
+
+  name: '${projectName}-kv-pe'
+
+  params: {
+
+    privateEndpointName: 'pe-kv-${projectName}-${environment}'
+
+    location: location
+
+    subnetId: network.outputs.privateEndpointsSubnetId
+
+    targetResourceId: keyVault.outputs.keyVaultId
+
+    groupId: 'vault'
+
+  }
+
+}
 //----------------------------
 // Storage Account
 //----------------------------
 
 module storage './modules/storage.bicep' = {
+
   name: '${projectName}-storage'
 
   params: {
+
     storageName: storageName
+
     location: location
+
+    tags: {
+
+      Project: projectName
+
+      Environment: environment
+
+      ManagedBy: 'Bicep'
+
+    }
+
   }
+
 }
 
 //----------------------------
@@ -172,6 +255,30 @@ module cosmos './modules/cosmos.bicep' = {
   }
 }
 
+// Service Bus
+module serviceBus './modules/servicebus.bicep' = {
+
+  name: '${projectName}-servicebus'
+
+  params: {
+
+    serviceBusName: serviceBusName
+
+    location: location
+
+    tags: {
+
+      Project: projectName
+
+      Environment: environment
+
+      ManagedBy: 'Bicep'
+
+    }
+
+  }
+
+}
 
 //==================================================
 // OUTPUTS
@@ -187,6 +294,10 @@ output managedIdentityPrincipalId string = managedIdentity.outputs.principalId
 
 output appServiceName string = appService.outputs.appServiceName
 
+output applicationInsightsConnectionString string =monitoring.outputs.applicationInsightsConnectionString
+
+output logAnalyticsWorkspaceId string =monitoring.outputs.logAnalyticsWorkspaceId
+
 output appServiceUrl string = appService.outputs.defaultHostName
 
 output keyVaultUri string = keyVault.outputs.keyVaultUri
@@ -194,3 +305,7 @@ output keyVaultUri string = keyVault.outputs.keyVaultUri
 output storageEndpoint string = storage.outputs.primaryBlobEndpoint
 
 output cosmosEndpoint string = cosmos.outputs.cosmosEndpoint
+
+output serviceBusId string = serviceBus.outputs.serviceBusId
+
+output serviceBusName string = serviceBus.outputs.serviceBusName

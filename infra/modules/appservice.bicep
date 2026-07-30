@@ -13,6 +13,12 @@ param managedIdentityId string
 @description('Resource tags')
 param tags object = {}
 
+@description('App Service subnet')
+param subnetId string
+
+@description('Application Insights Connection String')
+param applicationInsightsConnectionString string
+
 resource appService 'Microsoft.Web/sites@2023-12-01' = {
 
   name: appServiceName
@@ -41,6 +47,8 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
 
     clientAffinityEnabled: false
 
+    virtualNetworkSubnetId: subnetId
+    
     siteConfig: {
 
       linuxFxVersion: 'NODE|22-lts'
@@ -52,6 +60,15 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
       http20Enabled: true
 
       minTlsVersion: '1.2'
+
+      appSettings: [
+
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: applicationInsightsConnectionString
+        }
+
+      ]
 
     }
 

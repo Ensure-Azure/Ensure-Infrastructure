@@ -4,4 +4,4 @@ param projectName = 'centinela'
 
 param environment = 'dev'
 
-param location = 'westus2'
+param location = 'westus3'
